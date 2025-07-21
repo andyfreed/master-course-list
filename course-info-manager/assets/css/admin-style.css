@@ -1,0 +1,171 @@
+/* Course Info Manager Admin Styles */
+
+/* Dashboard Stats */
+.cim-stats {
+    display: flex;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.cim-stat-box {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    flex: 1;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.cim-stat-box h3 {
+    margin: 0 0 10px 0;
+    color: #1d2327;
+    font-size: 14px;
+}
+
+.cim-stat-number {
+    font-size: 32px;
+    font-weight: 600;
+    color: #2271b1;
+    margin: 10px 0;
+}
+
+/* Filters */
+.cim-filters {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.cim-filters input[type="text"] {
+    min-width: 300px;
+}
+
+.cim-filters select {
+    min-width: 150px;
+}
+
+/* Table Enhancements */
+.wp-list-table .column-four_digit {
+    width: 80px;
+}
+
+.wp-list-table .column-edition {
+    width: 100px;
+}
+
+.wp-list-table .column-matched {
+    width: 80px;
+    text-align: center;
+}
+
+.wp-list-table .dashicons-yes {
+    color: #46b450;
+}
+
+.wp-list-table .dashicons-no {
+    color: #dc3232;
+}
+
+/* Matching Interface */
+.cim-match-row {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #c3c4c7;
+    background: #fff;
+}
+
+.cim-match-row:hover {
+    background: #f6f7f7;
+}
+
+.cim-course-info {
+    flex: 1;
+}
+
+.cim-course-info strong {
+    color: #1d2327;
+    font-size: 14px;
+}
+
+.cim-match-select {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.cim-lifterlms-select {
+    width: 300px;
+}
+
+.cim-match-status {
+    min-width: 100px;
+    text-align: center;
+}
+
+/* Import Page */
+.cim-import-dropzone {
+    border: 2px dashed #c3c4c7;
+    border-radius: 4px;
+    padding: 40px;
+    text-align: center;
+    background: #f6f7f7;
+    margin: 20px 0;
+}
+
+.cim-import-dropzone.dragover {
+    border-color: #2271b1;
+    background: #f0f6fc;
+}
+
+/* History Table */
+.cim-history-table .column-date {
+    width: 150px;
+}
+
+.cim-history-table .column-field {
+    width: 150px;
+}
+
+.cim-history-table .old-value {
+    color: #dc3232;
+    text-decoration: line-through;
+}
+
+.cim-history-table .new-value {
+    color: #46b450;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .cim-stats {
+        flex-direction: column;
+    }
+    
+    .cim-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .cim-filters input[type="text"],
+    .cim-filters select {
+        min-width: 100%;
+        width: 100%;
+    }
+    
+    .cim-match-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .cim-match-select {
+        flex-direction: column;
+    }
+    
+    .cim-lifterlms-select {
+        width: 100%;
+    }
+} 

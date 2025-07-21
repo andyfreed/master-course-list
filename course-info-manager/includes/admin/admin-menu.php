@@ -1,0 +1,388 @@
+<?php
+/**
+ * Admin Menu Functions
+ */
+
+// Add admin menu
+add_action('admin_menu', 'cim_add_admin_menu');
+function cim_add_admin_menu() {
+    // Main menu
+    add_menu_page(
+        'Course Info Manager',
+        'Course Info',
+        'manage_options',
+        'course-info-manager',
+        'cim_dashboard_page',
+        'dashicons-welcome-learn-more',
+        30
+    );
+    
+    // Submenu pages
+    add_submenu_page(
+        'course-info-manager',
+        'Dashboard',
+        'Dashboard',
+        'manage_options',
+        'course-info-manager',
+        'cim_dashboard_page'
+    );
+    
+    add_submenu_page(
+        'course-info-manager',
+        'Import CSV',
+        'Import CSV',
+        'manage_options',
+        'cim-import',
+        'cim_import_page'
+    );
+    
+    add_submenu_page(
+        'course-info-manager',
+        'Course Matching',
+        'Course Matching',
+        'manage_options',
+        'cim-matching',
+        'cim_matching_page'
+    );
+    
+    add_submenu_page(
+        'course-info-manager',
+        'Version History',
+        'Version History',
+        'manage_options',
+        'cim-history',
+        'cim_history_page'
+    );
+}
+
+/**
+ * Dashboard Page
+ */
+function cim_dashboard_page() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'cim_course_info';
+    
+    // Get statistics
+    $total_courses = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+    $matched_courses = $wpdb->get_var("SELECT COUNT(DISTINCT cim_course_id) FROM {$wpdb->prefix}cim_course_matching");
+    $unmatched_courses = $total_courses - $matched_courses;
+    
+    ?>
+    <div class="wrap">
+        <h1>Course Information Manager Dashboard</h1>
+        
+        <!-- Statistics -->
+        <div class="cim-stats">
+            <div class="cim-stat-box">
+                <h3>Total Courses</h3>
+                <p class="cim-stat-number"><?php echo $total_courses; ?></p>
+            </div>
+            <div class="cim-stat-box">
+                <h3>Matched to LifterLMS</h3>
+                <p class="cim-stat-number"><?php echo $matched_courses; ?></p>
+            </div>
+            <div class="cim-stat-box">
+                <h3>Unmatched</h3>
+                <p class="cim-stat-number"><?php echo $unmatched_courses; ?></p>
+            </div>
+        </div>
+        
+        <!-- Course List -->
+        <h2>Course Information</h2>
+        <div class="cim-filters">
+            <input type="text" id="cim-search" placeholder="Search courses..." />
+            <select id="cim-filter-matched">
+                <option value="">All Courses</option>
+                <option value="matched">Matched Only</option>
+                <option value="unmatched">Unmatched Only</option>
+            </select>
+            <select id="cim-filter-certification">
+                <option value="">All Certifications</option>
+                <option value="cfp">CFP</option>
+                <option value="cpa">CPA</option>
+                <option value="ea">EA/OTRP</option>
+                <option value="cdfa">CDFA</option>
+            </select>
+        </div>
+        
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th>Four Digit</th>
+                    <th>Edition</th>
+                    <th>Course Title</th>
+                    <th>CFP</th>
+                    <th>CPA</th>
+                    <th>EA/OTRP</th>
+                    <th>CDFA</th>
+                    <th>Matched</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="cim-course-list">
+                <?php
+                $courses = $wpdb->get_results("
+                    SELECT c.*, m.lifterlms_course_id 
+                    FROM $table_name c
+                    LEFT JOIN {$wpdb->prefix}cim_course_matching m ON c.id = m.cim_course_id
+                    ORDER BY c.four_digit, c.edition DESC
+                    LIMIT 50
+                ");
+                
+                foreach ($courses as $course) {
+                    ?>
+                    <tr>
+                        <td><?php echo esc_html($course->four_digit); ?></td>
+                        <td><?php echo esc_html($course->edition); ?></td>
+                        <td><?php echo esc_html($course->course_title); ?></td>
+                        <td><?php echo $course->cfp_credits ?: '-'; ?></td>
+                        <td><?php echo $course->cpa_credits ?: '-'; ?></td>
+                        <td><?php echo $course->ea_otrp_credits ?: '-'; ?></td>
+                        <td><?php echo $course->cdfa_credits ?: '-'; ?></td>
+                        <td>
+                            <?php if ($course->lifterlms_course_id): ?>
+                                <span class="dashicons dashicons-yes" style="color: green;"></span>
+                            <?php else: ?>
+                                <span class="dashicons dashicons-no" style="color: red;"></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <a href="#" class="cim-edit-course" data-id="<?php echo $course->id; ?>">Edit</a> |
+                            <a href="<?php echo admin_url('admin.php?page=cim-history&course_id=' . $course->id); ?>">History</a>
+                        </td>
+                    </tr>
+                    <?php
+                }
+                ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <style>
+    .cim-stats {
+        display: flex;
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .cim-stat-box {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 20px;
+        text-align: center;
+        flex: 1;
+    }
+    .cim-stat-number {
+        font-size: 32px;
+        font-weight: bold;
+        color: #2271b1;
+        margin: 10px 0;
+    }
+    .cim-filters {
+        margin: 20px 0;
+        display: flex;
+        gap: 10px;
+    }
+    .cim-filters input, .cim-filters select {
+        padding: 5px;
+    }
+    </style>
+    <?php
+}
+
+/**
+ * Import Page
+ */
+function cim_import_page() {
+    ?>
+    <div class="wrap">
+        <h1>Import Course Information from CSV</h1>
+        
+        <?php
+        if (isset($_POST['cim_import_csv']) && check_admin_referer('cim_import_csv_nonce')) {
+            if (!empty($_FILES['cim_csv_file']['tmp_name'])) {
+                $importer = new CIM_CSV_Importer();
+                $result = $importer->import_csv($_FILES['cim_csv_file']['tmp_name']);
+                
+                if ($result) {
+                    $results = $importer->get_results();
+                    echo '<div class="notice notice-success"><p>';
+                    echo sprintf('Import completed: %d courses imported, %d skipped.', 
+                        $results['imported'], $results['skipped']);
+                    echo '</p></div>';
+                } else {
+                    $results = $importer->get_results();
+                    echo '<div class="notice notice-error"><p>';
+                    echo 'Import failed: ' . implode(', ', $results['errors']);
+                    echo '</p></div>';
+                }
+            }
+        }
+        ?>
+        
+        <form method="post" enctype="multipart/form-data">
+            <?php wp_nonce_field('cim_import_csv_nonce'); ?>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row">CSV File</th>
+                    <td>
+                        <input type="file" name="cim_csv_file" accept=".csv" required />
+                        <p class="description">Upload your course spreadsheet CSV file.</p>
+                    </td>
+                </tr>
+            </table>
+            
+            <h3>Import Notes:</h3>
+            <ul>
+                <li>The import will update existing courses based on the edition number</li>
+                <li>All changes are tracked in the version history</li>
+                <li>The import uses database transactions - if any error occurs, no changes will be saved</li>
+                <li>Your existing LifterLMS data will not be modified</li>
+            </ul>
+            
+            <p class="submit">
+                <input type="submit" name="cim_import_csv" class="button-primary" value="Import CSV" />
+            </p>
+        </form>
+    </div>
+    <?php
+}
+
+/**
+ * Matching Page
+ */
+function cim_matching_page() {
+    global $wpdb;
+    
+    // Get unmatched courses
+    $unmatched = $wpdb->get_results("
+        SELECT c.* 
+        FROM {$wpdb->prefix}cim_course_info c
+        LEFT JOIN {$wpdb->prefix}cim_course_matching m ON c.id = m.cim_course_id
+        WHERE m.id IS NULL
+        ORDER BY c.four_digit, c.edition
+    ");
+    
+    // Get LifterLMS courses
+    $lifterlms_courses = $wpdb->get_results("
+        SELECT ID, post_title 
+        FROM {$wpdb->posts}
+        WHERE post_type = 'course' AND post_status = 'publish'
+        ORDER BY post_title
+    ");
+    
+    ?>
+    <div class="wrap">
+        <h1>Course Matching</h1>
+        
+        <p>Match your imported courses with existing LifterLMS courses. The system will suggest matches based on course codes and titles.</p>
+        
+        <div id="cim-matching-container">
+            <h2>Unmatched Courses (<?php echo count($unmatched); ?>)</h2>
+            
+            <?php foreach ($unmatched as $course): ?>
+            <div class="cim-match-row" data-course-id="<?php echo $course->id; ?>">
+                <div class="cim-course-info">
+                    <strong><?php echo esc_html($course->four_digit . ' - ' . $course->edition); ?></strong><br>
+                    <?php echo esc_html($course->course_title); ?>
+                </div>
+                <div class="cim-match-select">
+                    <select class="cim-lifterlms-select">
+                        <option value="">-- Select LifterLMS Course --</option>
+                        <?php foreach ($lifterlms_courses as $lms_course): ?>
+                            <option value="<?php echo $lms_course->ID; ?>">
+                                <?php echo esc_html($lms_course->post_title); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="button cim-match-button">Match</button>
+                    <span class="cim-match-status"></span>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    
+    <style>
+    .cim-match-row {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+    .cim-course-info {
+        flex: 1;
+    }
+    .cim-match-select {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    .cim-lifterlms-select {
+        width: 300px;
+    }
+    </style>
+    <?php
+}
+
+/**
+ * History Page
+ */
+function cim_history_page() {
+    global $wpdb;
+    
+    $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
+    
+    if ($course_id) {
+        $course = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}cim_course_info WHERE id = %d",
+            $course_id
+        ));
+        
+        $history = $wpdb->get_results($wpdb->prepare(
+            "SELECT h.*, u.display_name 
+             FROM {$wpdb->prefix}cim_course_history h
+             LEFT JOIN {$wpdb->users} u ON h.changed_by = u.ID
+             WHERE h.course_id = %d
+             ORDER BY h.change_date DESC",
+            $course_id
+        ));
+    }
+    
+    ?>
+    <div class="wrap">
+        <h1>Course Version History</h1>
+        
+        <?php if ($course_id && $course): ?>
+            <h2><?php echo esc_html($course->four_digit . ' - ' . $course->course_title); ?></h2>
+            
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Field</th>
+                        <th>Old Value</th>
+                        <th>New Value</th>
+                        <th>Changed By</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($history as $change): ?>
+                    <tr>
+                        <td><?php echo $change->change_date; ?></td>
+                        <td><?php echo esc_html($change->field_name); ?></td>
+                        <td><?php echo esc_html($change->old_value); ?></td>
+                        <td><?php echo esc_html($change->new_value); ?></td>
+                        <td><?php echo esc_html($change->display_name ?: 'System'); ?></td>
+                        <td><?php echo esc_html($change->change_notes); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>Please select a course to view its history.</p>
+        <?php endif; ?>
+    </div>
+    <?php
+} 

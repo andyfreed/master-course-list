@@ -1,0 +1,22 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+
+# WordPress
+wp-config.php
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Dependencies (if any get added later)
+node_modules/
+vendor/ 
