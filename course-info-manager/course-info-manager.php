@@ -64,9 +64,12 @@ function cim_create_database_tables() {
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     }
     
-    // Main course info table
+    // Drop existing table to ensure schema changes are applied
     $table_name = $wpdb->prefix . 'cim_course_info';
-    $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+    $wpdb->query("DROP TABLE IF EXISTS $table_name");
+    
+    // Main course info table
+    $sql = "CREATE TABLE $table_name (
         id bigint(20) NOT NULL AUTO_INCREMENT,
         four_digit varchar(10) NOT NULL,
         edition varchar(20) NOT NULL,

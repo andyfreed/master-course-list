@@ -334,8 +334,28 @@ class CIM_CSV_Importer {
             return null;
         }
         
-        // Trim whitespace
+        // Trim whitespace and remove any invisible characters
         $value = trim($value);
+        $value = preg_replace('/[\x00-\x1F\x7F]/', '', $value); // Remove control characters
+        
+        // Handle varchar fields with length limits
+        $varchar_fields = array(
+            'exam_changes' => 50,
+            'subs_updates' => 50,
+            'tx_subject_code' => 50,
+            'cfp_board_number' => 50,
+            'ea_number' => 50,
+            'erpa_number' => 50,
+            'iar_number' => 50
+        );
+        
+        if (isset($varchar_fields[$field])) {
+            $max_length = $varchar_fields[$field];
+            if (strlen($value) > $max_length) {
+                $this->debug_info[] = "Truncating $field from " . strlen($value) . " to $max_length characters: '$value'";
+                $value = substr($value, 0, $max_length);
+            }
+        }
         
         // Handle numeric fields
         $numeric_fields = array(

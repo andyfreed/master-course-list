@@ -195,66 +195,71 @@ function cim_dashboard_page() {
 function cim_import_page() {
     ?>
     <div class="wrap">
-        <h1>Import Course Information from CSV</h1>
+        <h1>Course Info Manager - Import</h1>
+        
+        <?php if (isset($_POST['update_database'])): ?>
+            <?php
+            try {
+                cim_create_database_tables();
+                echo '<div class="notice notice-success"><p>Database tables updated successfully!</p></div>';
+            } catch (Exception $e) {
+                echo '<div class="notice notice-error"><p>Error updating database: ' . esc_html($e->getMessage()) . '</p></div>';
+            }
+            ?>
+        <?php endif; ?>
         
         <?php
-        if (isset($_POST['cim_import_csv']) && check_admin_referer('cim_import_csv_nonce')) {
-            if (!empty($_FILES['cim_csv_file']['tmp_name'])) {
-                $importer = new CIM_CSV_Importer();
-                $result = $importer->import_csv($_FILES['cim_csv_file']['tmp_name']);
+        if (isset($_POST['import_csv']) && !empty($_FILES['csv_file']['tmp_name'])) {
+            $importer = new CIM_CSV_Importer();
+            $result = $importer->import_csv($_FILES['csv_file']['tmp_name']);
+            
+            if ($result) {
+                $results = $importer->get_results();
+                echo '<div class="notice notice-success"><p>';
+                echo sprintf('Import completed: %d courses imported, %d updated, %d skipped.', 
+                    $results['imported'], $results['updated'], $results['skipped']);
+                echo '</p></div>';
                 
-                if ($result) {
-                    $results = $importer->get_results();
-                    echo '<div class="notice notice-success"><p>';
-                    echo sprintf('Import completed: %d courses imported, %d skipped.', 
-                        $results['imported'], $results['skipped']);
-                    echo '</p></div>';
-                    
-                    // Show debug info if there are skipped courses
-                    if ($results['skipped'] > 0 && !empty($results['debug'])) {
-                        echo '<div class="notice notice-warning"><p><strong>Debug Information:</strong></p>';
-                        echo '<ul>';
-                        foreach (array_slice($results['debug'], 0, 10) as $debug) {
-                            echo '<li>' . esc_html($debug) . '</li>';
-                        }
-                        if (count($results['debug']) > 10) {
-                            echo '<li>... and ' . (count($results['debug']) - 10) . ' more</li>';
-                        }
-                        echo '</ul></div>';
+                // Show debug info if there are skipped courses
+                if ($results['skipped'] > 0 && !empty($results['debug'])) {
+                    echo '<div class="notice notice-warning"><p><strong>Debug Information:</strong></p>';
+                    echo '<ul>';
+                    foreach (array_slice($results['debug'], 0, 10) as $debug) {
+                        echo '<li>' . esc_html($debug) . '</li>';
                     }
-                } else {
-                    $results = $importer->get_results();
-                    echo '<div class="notice notice-error"><p>';
-                    echo 'Import failed: ' . implode(', ', $results['errors']);
-                    echo '</p></div>';
+                    if (count($results['debug']) > 10) {
+                        echo '<li>... and ' . (count($results['debug']) - 10) . ' more</li>';
+                    }
+                    echo '</ul></div>';
                 }
+            } else {
+                $results = $importer->get_results();
+                echo '<div class="notice notice-error"><p>';
+                echo 'Import failed: ' . implode(', ', $results['errors']);
+                echo '</p></div>';
             }
         }
         ?>
         
         <form method="post" enctype="multipart/form-data">
-            <?php wp_nonce_field('cim_import_csv_nonce'); ?>
-            
             <table class="form-table">
+                <tr>
+                    <th scope="row">Update Database Schema</th>
+                    <td>
+                        <p>If you're getting field length errors, click this button to recreate the database tables with the updated schema:</p>
+                        <input type="submit" name="update_database" class="button button-secondary" value="Update Database Schema">
+                    </td>
+                </tr>
                 <tr>
                     <th scope="row">CSV File</th>
                     <td>
-                        <input type="file" name="cim_csv_file" accept=".csv" required />
-                        <p class="description">Upload your course spreadsheet CSV file.</p>
+                        <input type="file" name="csv_file" accept=".csv" required>
+                        <p class="description">Select the master course spreadsheet CSV file</p>
                     </td>
                 </tr>
             </table>
-            
-            <h3>Import Notes:</h3>
-            <ul>
-                <li>The import will update existing courses based on the edition number</li>
-                <li>All changes are tracked in the version history</li>
-                <li>The import uses database transactions - if any error occurs, no changes will be saved</li>
-                <li>Your existing LifterLMS data will not be modified</li>
-            </ul>
-            
             <p class="submit">
-                <input type="submit" name="cim_import_csv" class="button-primary" value="Import CSV" />
+                <input type="submit" name="import_csv" class="button button-primary" value="Import CSV">
             </p>
         </form>
     </div>
