@@ -89,6 +89,18 @@ class CIM_CSV_Importer {
                     $this->debug_info[] = "Used current_year as edition for course {$course_data['four_digit']}";
                 }
                 
+                // Handle empty current_year - try to use edition as fallback
+                if (empty($course_data['current_year']) && !empty($course_data['edition'])) {
+                    $course_data['current_year'] = $course_data['edition'];
+                    $this->debug_info[] = "Used edition as current_year for course {$course_data['four_digit']}";
+                }
+                
+                // Handle empty course_title - use a default
+                if (empty($course_data['course_title'])) {
+                    $course_data['course_title'] = "Course {$course_data['four_digit']}";
+                    $this->debug_info[] = "Used default title for course {$course_data['four_digit']}";
+                }
+                
                 // Skip if no four_digit code
                 if (empty($course_data['four_digit'])) {
                     $this->skipped_count++;
@@ -309,9 +321,12 @@ class CIM_CSV_Importer {
      */
     private function clean_value($field, $value) {
         // Handle empty values
-        if ($value === '' || $value === 'na' || $value === '-') {
+        if ($value === '' || $value === 'na' || $value === '-' || $value === ' ' || $value === null) {
             return null;
         }
+        
+        // Trim whitespace
+        $value = trim($value);
         
         // Handle numeric fields
         $numeric_fields = array(
@@ -324,18 +339,29 @@ class CIM_CSV_Importer {
         );
         
         if (in_array($field, $numeric_fields)) {
-            // Remove commas and spaces
-            $value = str_replace(array(',', ' '), '', $value);
-            return is_numeric($value) ? $value : null;
+            // Remove commas, spaces, and other non-numeric characters except decimal points
+            $value = preg_replace('/[^0-9.-]/', '', $value);
+            return is_numeric($value) && $value !== '' ? $value : null;
         }
         
         // Handle date fields
         if ($field === 'annual_update') {
+            if (empty($value)) {
+                return null;
+            }
             $date = date_create_from_format('n/j/Y', $value);
             if (!$date) {
                 $date = date_create_from_format('n/j/y', $value);
             }
+            if (!$date) {
+                $date = date_create_from_format('Y-m-d', $value);
+            }
             return $date ? $date->format('Y-m-d') : null;
+        }
+        
+        // Handle text fields - return empty string as null
+        if (empty($value)) {
+            return null;
         }
         
         return $value;
