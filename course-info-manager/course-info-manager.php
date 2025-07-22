@@ -1,11 +1,19 @@
 <?php
 /**
  * Plugin Name: Course Information Manager
- * Plugin URI: https://yoursite.com/
- * Description: Manages course information, credits, and version history separately from LifterLMS
+ * Plugin URI: https://github.com/andyfreed/master-course-list
+ * Description: Manages course information, credits, and version history separately from LifterLMS. Handles CSV imports, course matching, and certification tracking for CPAs, CFPs, EAs, and other professionals.
  * Version: 1.0.0
- * Author: Your Name
+ * Requires at least: 5.0
+ * Tested up to: 6.4
+ * Requires PHP: 7.4
+ * Author: Andrew Freed
+ * Author URI: https://github.com/andyfreed
  * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: course-info-manager
+ * Domain Path: /languages
+ * Network: false
  */
 
 // Prevent direct access
@@ -35,6 +43,11 @@ function cim_deactivate_plugin() {
 function cim_create_database_tables() {
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
+    
+    // Ensure upgrade.php is available
+    if (!function_exists('dbDelta')) {
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    }
     
     // Main course info table
     $table_name = $wpdb->prefix . 'cim_course_info';
@@ -90,8 +103,7 @@ function cim_create_database_tables() {
         KEY idx_lifterlms_id (lifterlms_course_id)
     ) $charset_collate;";
     
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    dbDelta($sql);
+    $result = dbDelta($sql);
     
     // Version history table
     $history_table = $wpdb->prefix . 'cim_course_history';
@@ -112,7 +124,7 @@ function cim_create_database_tables() {
         KEY idx_date (change_date)
     ) $charset_collate;";
     
-    dbDelta($sql_history);
+    $result_history = dbDelta($sql_history);
     
     // Course matching table (links to LifterLMS courses)
     $matching_table = $wpdb->prefix . 'cim_course_matching';
@@ -130,15 +142,30 @@ function cim_create_database_tables() {
         KEY idx_lifterlms_course (lifterlms_course_id)
     ) $charset_collate;";
     
-    dbDelta($sql_matching);
+    $result_matching = dbDelta($sql_matching);
+    
+    // Log any errors for debugging
+    if (!empty($wpdb->last_error)) {
+        error_log('CIM Plugin: Database table creation error: ' . $wpdb->last_error);
+    }
 }
 
 // Include required files
-require_once CIM_PLUGIN_PATH . 'includes/class-course-manager.php';
-require_once CIM_PLUGIN_PATH . 'includes/class-csv-importer.php';
-require_once CIM_PLUGIN_PATH . 'includes/class-course-matcher.php';
-require_once CIM_PLUGIN_PATH . 'includes/admin/admin-menu.php';
-require_once CIM_PLUGIN_PATH . 'includes/admin/admin-ajax.php';
+$required_files = array(
+    CIM_PLUGIN_PATH . 'includes/class-course-manager.php',
+    CIM_PLUGIN_PATH . 'includes/class-csv-importer.php',
+    CIM_PLUGIN_PATH . 'includes/class-course-matcher.php',
+    CIM_PLUGIN_PATH . 'includes/admin/admin-menu.php',
+    CIM_PLUGIN_PATH . 'includes/admin/admin-ajax.php'
+);
+
+foreach ($required_files as $file) {
+    if (file_exists($file)) {
+        require_once $file;
+    } else {
+        error_log('CIM Plugin: Required file not found: ' . $file);
+    }
+}
 
 // Initialize the plugin
 add_action('init', 'cim_init');
