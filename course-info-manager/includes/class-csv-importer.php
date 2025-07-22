@@ -9,6 +9,7 @@ class CIM_CSV_Importer {
     private $errors = array();
     private $imported_count = 0;
     private $skipped_count = 0;
+    private $debug_info = array();
     
     /**
      * Import CSV file
@@ -58,15 +59,30 @@ class CIM_CSV_Importer {
                     }
                 }
                 
+                // Handle empty edition - try to use current_year as fallback
+                if (empty($course_data['edition']) && !empty($course_data['current_year'])) {
+                    $course_data['edition'] = $course_data['current_year'];
+                    $this->debug_info[] = "Used current_year as edition for course {$course_data['four_digit']}";
+                }
+                
                 // Skip if no four_digit code
                 if (empty($course_data['four_digit'])) {
                     $this->skipped_count++;
+                    $this->debug_info[] = "Skipped: No four_digit code";
                     continue;
                 }
                 
-                // Check if course already exists
+                // Skip if no edition (required for unique identification)
+                if (empty($course_data['edition'])) {
+                    $this->skipped_count++;
+                    $this->debug_info[] = "Skipped: No edition for course {$course_data['four_digit']}";
+                    continue;
+                }
+                
+                // Check if course already exists by four_digit + edition combination
                 $existing = $wpdb->get_row($wpdb->prepare(
-                    "SELECT id FROM $table_name WHERE edition = %s",
+                    "SELECT id FROM $table_name WHERE four_digit = %s AND edition = %s",
+                    $course_data['four_digit'],
                     $course_data['edition']
                 ));
                 
@@ -232,7 +248,8 @@ class CIM_CSV_Importer {
         return array(
             'imported' => $this->imported_count,
             'skipped' => $this->skipped_count,
-            'errors' => $this->errors
+            'errors' => $this->errors,
+            'debug' => $this->debug_info
         );
     }
 } 

@@ -85,7 +85,7 @@ function cim_create_database_tables() {
         lifterlms_course_id bigint(20),
         last_updated timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
-        UNIQUE KEY unique_edition (edition),
+        UNIQUE KEY unique_course_edition (four_digit, edition),
         KEY idx_four_digit (four_digit),
         KEY idx_lifterlms_id (lifterlms_course_id)
     ) $charset_collate;";

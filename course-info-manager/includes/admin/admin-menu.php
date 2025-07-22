@@ -209,6 +209,19 @@ function cim_import_page() {
                     echo sprintf('Import completed: %d courses imported, %d skipped.', 
                         $results['imported'], $results['skipped']);
                     echo '</p></div>';
+                    
+                    // Show debug info if there are skipped courses
+                    if ($results['skipped'] > 0 && !empty($results['debug'])) {
+                        echo '<div class="notice notice-warning"><p><strong>Debug Information:</strong></p>';
+                        echo '<ul>';
+                        foreach (array_slice($results['debug'], 0, 10) as $debug) {
+                            echo '<li>' . esc_html($debug) . '</li>';
+                        }
+                        if (count($results['debug']) > 10) {
+                            echo '<li>... and ' . (count($results['debug']) - 10) . ' more</li>';
+                        }
+                        echo '</ul></div>';
+                    }
                 } else {
                     $results = $importer->get_results();
                     echo '<div class="notice notice-error"><p>';
