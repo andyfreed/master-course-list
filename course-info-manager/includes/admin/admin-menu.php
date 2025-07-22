@@ -53,6 +53,7 @@ function cim_add_admin_menu() {
         'cim-history',
         'cim_history_page'
     );
+    add_submenu_page('course-info-manager', 'Diagnostics', 'Diagnostics', 'manage_options', 'cim-diagnostics', 'cim_diagnostics_page');
 }
 
 /**
@@ -281,52 +282,93 @@ function cim_matching_page() {
         ORDER BY c.four_digit, c.edition
     ");
     
-    // Get LifterLMS courses
-    $lifterlms_courses = $wpdb->get_results("
-        SELECT ID, post_title 
-        FROM {$wpdb->posts}
-        WHERE post_type = 'course' AND post_status = 'publish'
-        ORDER BY post_title
-    ");
+    // Get LifterLMS courses using the new discovery function
+    $matcher = new CIM_Course_Matcher();
+    $lifterlms_courses = $matcher->get_lifterlms_courses();
     
     ?>
     <div class="wrap">
         <h1>Course Matching</h1>
         
-        <p>Match your imported courses with existing LifterLMS courses. The system will suggest matches based on course codes and titles.</p>
-        
-        <div id="cim-matching-container">
-            <h2>Unmatched Courses (<?php echo count($unmatched); ?>)</h2>
-            
-            <?php foreach ($unmatched as $course): ?>
-            <div class="cim-match-row" data-course-id="<?php echo $course->id; ?>">
-                <div class="cim-course-info">
-                    <strong><?php echo esc_html($course->four_digit . ' - ' . $course->edition); ?></strong><br>
-                    <?php echo esc_html($course->course_title); ?>
-                </div>
-                <div class="cim-match-select">
-                    <select class="cim-lifterlms-select">
-                        <option value="">-- Select LifterLMS Course --</option>
-                        <?php foreach ($lifterlms_courses as $lms_course): ?>
-                            <option value="<?php echo $lms_course->ID; ?>">
-                                <?php echo esc_html($lms_course->post_title); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="button cim-match-button">Match</button>
-                    <span class="cim-match-status"></span>
-                </div>
+        <div class="cim-matching-stats">
+            <div class="cim-stat-box">
+                <h3>Imported Courses</h3>
+                <p class="cim-stat-number"><?php echo count($unmatched); ?></p>
+                <p>Ready to match</p>
             </div>
-            <?php endforeach; ?>
+            <div class="cim-stat-box">
+                <h3>LifterLMS Courses Found</h3>
+                <p class="cim-stat-number"><?php echo count($lifterlms_courses); ?></p>
+                <p>Available for matching</p>
+            </div>
         </div>
+        
+        <?php if (empty($lifterlms_courses)): ?>
+            <div class="notice notice-warning">
+                <p><strong>No LifterLMS courses found!</strong></p>
+                <p>The plugin searched for courses in the following post types: 'course', 'llms_course', 'sfwd-courses', 'courses'</p>
+                <p>It also looked for posts with course-related meta fields like '_course_code', 'course_code', '_sku', 'course_credits', 'cfp_credits', 'cpa_credits'</p>
+                <p>If your courses are stored differently, please let us know the post type or meta fields used.</p>
+            </div>
+        <?php else: ?>
+            <p>Match your imported courses with existing LifterLMS courses. The system will suggest matches based on course codes and titles.</p>
+            
+            <div id="cim-matching-container">
+                <h2>Unmatched Courses (<?php echo count($unmatched); ?>)</h2>
+                
+                <?php foreach ($unmatched as $course): ?>
+                <div class="cim-match-row" data-course-id="<?php echo $course->id; ?>">
+                    <div class="cim-course-info">
+                        <strong><?php echo esc_html($course->four_digit . ' - ' . $course->edition); ?></strong><br>
+                        <?php echo esc_html($course->course_title); ?><br>
+                        <small>Credits: <?php echo esc_html($course->cfp_credits ? 'CFP: ' . $course->cfp_credits : ''); ?> 
+                               <?php echo esc_html($course->cpa_credits ? 'CPA: ' . $course->cpa_credits : ''); ?></small>
+                    </div>
+                    <div class="cim-match-select">
+                        <select class="cim-lifterlms-select">
+                            <option value="">-- Select LifterLMS Course --</option>
+                            <?php foreach ($lifterlms_courses as $lms_course): ?>
+                                <option value="<?php echo $lms_course['id']; ?>">
+                                    <?php echo esc_html($lms_course['title']); ?> 
+                                    (<?php echo esc_html($lms_course['type']); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="button cim-match-button">Match</button>
+                        <span class="cim-match-status"></span>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
     
     <style>
+    .cim-matching-stats {
+        display: flex;
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .cim-stat-box {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 20px;
+        text-align: center;
+        flex: 1;
+    }
+    .cim-stat-number {
+        font-size: 32px;
+        font-weight: bold;
+        color: #2271b1;
+        margin: 10px 0;
+    }
     .cim-match-row {
         display: flex;
         align-items: center;
-        padding: 10px;
+        padding: 15px;
         border-bottom: 1px solid #ddd;
+        background: #fff;
+        margin-bottom: 5px;
     }
     .cim-course-info {
         flex: 1;
@@ -337,7 +379,7 @@ function cim_matching_page() {
         align-items: center;
     }
     .cim-lifterlms-select {
-        width: 300px;
+        width: 400px;
     }
     </style>
     <?php
@@ -401,6 +443,203 @@ function cim_history_page() {
         <?php else: ?>
             <p>Please select a course to view its history.</p>
         <?php endif; ?>
+    </div>
+    <?php
+} 
+
+/**
+ * Diagnostics Page
+ */
+function cim_diagnostics_page() {
+    global $wpdb;
+    
+    ?>
+    <div class="wrap">
+        <h1>Course Information Manager - Diagnostics</h1>
+        
+        <h2>Database Structure Analysis</h2>
+        
+        <h3>1. Post Types Found</h3>
+        <?php
+        $post_types = $wpdb->get_results("
+            SELECT post_type, COUNT(*) as count
+            FROM {$wpdb->posts}
+            WHERE post_status = 'publish'
+            GROUP BY post_type
+            ORDER BY count DESC
+        ");
+        
+        if ($post_types): ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Post Type</th>
+                        <th>Count</th>
+                        <th>Likely Course Type?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($post_types as $pt): ?>
+                        <tr>
+                            <td><?php echo esc_html($pt->post_type); ?></td>
+                            <td><?php echo $pt->count; ?></td>
+                            <td>
+                                <?php 
+                                $course_types = array('course', 'llms_course', 'sfwd-courses', 'courses', 'lesson', 'llms_lesson');
+                                echo in_array($pt->post_type, $course_types) ? '✓ Yes' : '✗ No';
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+        
+        <h3>2. Course-Related Meta Fields</h3>
+        <?php
+        $meta_fields = $wpdb->get_results("
+            SELECT meta_key, COUNT(*) as count
+            FROM {$wpdb->postmeta}
+            WHERE meta_key LIKE '%course%' 
+               OR meta_key LIKE '%cfp%' 
+               OR meta_key LIKE '%cpa%' 
+               OR meta_key LIKE '%credit%'
+               OR meta_key LIKE '%sku%'
+               OR meta_key LIKE '%code%'
+            GROUP BY meta_key
+            ORDER BY count DESC
+            LIMIT 20
+        ");
+        
+        if ($meta_fields): ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Meta Key</th>
+                        <th>Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($meta_fields as $meta): ?>
+                        <tr>
+                            <td><?php echo esc_html($meta->meta_key); ?></td>
+                            <td><?php echo $meta->count; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+        
+        <h3>3. Sample Course Posts</h3>
+        <?php
+        $sample_courses = $wpdb->get_results("
+            SELECT ID, post_title, post_type, post_status
+            FROM {$wpdb->posts}
+            WHERE post_type IN ('course', 'llms_course', 'sfwd-courses', 'courses')
+            AND post_status = 'publish'
+            ORDER BY post_title
+            LIMIT 10
+        ");
+        
+        if ($sample_courses): ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Post Type</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($sample_courses as $course): ?>
+                        <tr>
+                            <td><?php echo $course->ID; ?></td>
+                            <td><?php echo esc_html($course->post_title); ?></td>
+                            <td><?php echo esc_html($course->post_type); ?></td>
+                            <td><?php echo esc_html($course->post_status); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No course posts found with standard post types.</p>
+        <?php endif; ?>
+        
+        <h3>4. Sample Meta Data</h3>
+        <?php
+        $sample_meta = $wpdb->get_results("
+            SELECT p.ID, p.post_title, pm.meta_key, pm.meta_value
+            FROM {$wpdb->posts} p
+            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE p.post_status = 'publish'
+            AND (pm.meta_key LIKE '%course%' 
+                 OR pm.meta_key LIKE '%cfp%' 
+                 OR pm.meta_key LIKE '%cpa%' 
+                 OR pm.meta_key LIKE '%credit%'
+                 OR pm.meta_key LIKE '%sku%'
+                 OR pm.meta_key LIKE '%code%')
+            ORDER BY p.post_title, pm.meta_key
+            LIMIT 20
+        ");
+        
+        if ($sample_meta): ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Post ID</th>
+                        <th>Title</th>
+                        <th>Meta Key</th>
+                        <th>Meta Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($sample_meta as $meta): ?>
+                        <tr>
+                            <td><?php echo $meta->ID; ?></td>
+                            <td><?php echo esc_html($meta->post_title); ?></td>
+                            <td><?php echo esc_html($meta->meta_key); ?></td>
+                            <td><?php echo esc_html(substr($meta->meta_value, 0, 100)); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+        
+        <h3>5. Plugin Status</h3>
+        <table class="wp-list-table widefat fixed striped">
+            <tr>
+                <td><strong>LifterLMS Active:</strong></td>
+                <td><?php echo function_exists('lifterlms_get_post') ? '✓ Yes' : '✗ No'; ?></td>
+            </tr>
+            <tr>
+                <td><strong>CIM Tables Created:</strong></td>
+                <td>
+                    <?php 
+                    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$wpdb->prefix}cim_course_info'");
+                    echo $table_exists ? '✓ Yes' : '✗ No';
+                    ?>
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Imported Courses:</strong></td>
+                <td>
+                    <?php 
+                    $course_count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}cim_course_info");
+                    echo $course_count ? $course_count : '0';
+                    ?>
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Matched Courses:</strong></td>
+                <td>
+                    <?php 
+                    $matched_count = $wpdb->get_var("SELECT COUNT(DISTINCT cim_course_id) FROM {$wpdb->prefix}cim_course_matching");
+                    echo $matched_count ? $matched_count : '0';
+                    ?>
+                </td>
+            </tr>
+        </table>
     </div>
     <?php
 } 

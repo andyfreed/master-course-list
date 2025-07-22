@@ -256,6 +256,98 @@ class CIM_Course_Matcher {
     }
     
     /**
+     * Get all LifterLMS courses for matching
+     */
+    public function get_lifterlms_courses() {
+        global $wpdb;
+        
+        $courses = array();
+        
+        // Method 1: Check for LifterLMS course post type
+        $lifterlms_courses = $wpdb->get_results("
+            SELECT ID, post_title, post_content 
+            FROM {$wpdb->posts}
+            WHERE post_type = 'course' 
+            AND post_status = 'publish'
+            ORDER BY post_title
+        ");
+        
+        if (!empty($lifterlms_courses)) {
+            foreach ($lifterlms_courses as $course) {
+                $courses[] = array(
+                    'id' => $course->ID,
+                    'title' => $course->post_title,
+                    'content' => $course->post_content,
+                    'type' => 'lifterlms_course'
+                );
+            }
+        }
+        
+        // Method 2: Check for custom post types that might be courses
+        $custom_courses = $wpdb->get_results("
+            SELECT ID, post_title, post_content, post_type
+            FROM {$wpdb->posts}
+            WHERE post_type IN ('llms_course', 'sfwd-courses', 'course', 'courses')
+            AND post_status = 'publish'
+            ORDER BY post_title
+        ");
+        
+        foreach ($custom_courses as $course) {
+            // Avoid duplicates
+            $exists = false;
+            foreach ($courses as $existing) {
+                if ($existing['id'] == $course->ID) {
+                    $exists = true;
+                    break;
+                }
+            }
+            
+            if (!$exists) {
+                $courses[] = array(
+                    'id' => $course->ID,
+                    'title' => $course->post_title,
+                    'content' => $course->post_content,
+                    'type' => $course->post_type
+                );
+            }
+        }
+        
+        // Method 3: Check post meta for course-related data
+        $meta_courses = $wpdb->get_results("
+            SELECT DISTINCT p.ID, p.post_title, p.post_content, pm.meta_key, pm.meta_value
+            FROM {$wpdb->posts} p
+            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE p.post_status = 'publish'
+            AND pm.meta_key IN ('_course_code', 'course_code', '_sku', 'course_credits', 'cfp_credits', 'cpa_credits')
+            ORDER BY p.post_title
+        ");
+        
+        foreach ($meta_courses as $course) {
+            // Avoid duplicates
+            $exists = false;
+            foreach ($courses as $existing) {
+                if ($existing['id'] == $course->ID) {
+                    $exists = true;
+                    break;
+                }
+            }
+            
+            if (!$exists) {
+                $courses[] = array(
+                    'id' => $course->ID,
+                    'title' => $course->post_title,
+                    'content' => $course->post_content,
+                    'meta_key' => $course->meta_key,
+                    'meta_value' => $course->meta_value,
+                    'type' => 'meta_course'
+                );
+            }
+        }
+        
+        return $courses;
+    }
+    
+    /**
      * Auto-match courses with high confidence
      */
     public function auto_match_all($min_confidence = 95) {
