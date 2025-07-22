@@ -8,23 +8,30 @@ add_action('wp_ajax_cim_match_course', 'cim_ajax_match_course');
 function cim_ajax_match_course() {
     // Check nonce
     if (!wp_verify_nonce($_POST['nonce'], 'cim_ajax_nonce')) {
-        wp_die('Security check failed');
+        error_log('CIM: Nonce verification failed');
+        wp_send_json_error('Security check failed');
     }
     
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die('Insufficient permissions');
+        error_log('CIM: Insufficient permissions');
+        wp_send_json_error('Insufficient permissions');
     }
     
     $cim_course_id = intval($_POST['cim_course_id']);
     $lifterlms_course_id = intval($_POST['lifterlms_course_id']);
     
+    error_log('CIM: Attempting to match course ' . $cim_course_id . ' with LifterLMS course ' . $lifterlms_course_id);
+    
     if (!$cim_course_id || !$lifterlms_course_id) {
+        error_log('CIM: Invalid course IDs - CIM: ' . $cim_course_id . ', LLMS: ' . $lifterlms_course_id);
         wp_send_json_error('Invalid course IDs');
     }
     
     $matcher = new CIM_Course_Matcher();
     $result = $matcher->create_match($cim_course_id, $lifterlms_course_id);
+    
+    error_log('CIM: Match result: ' . ($result ? 'success' : 'failed'));
     
     if ($result) {
         wp_send_json_success('Courses matched successfully');

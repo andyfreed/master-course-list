@@ -26,10 +26,14 @@ jQuery(document).ready(function($) {
     }
     
     // Course matching functionality
-    $('.cim-match-button').on('click', function() {
+    $(document).on('click', '.cim-match-button', function() {
+        console.log('Match button clicked');
         const $row = $(this).closest('.cim-match-row');
         const courseId = $row.data('course-id');
         const lifterLmsId = $row.find('.cim-lifterlms-select').val();
+        
+        console.log('Course ID:', courseId);
+        console.log('LifterLMS ID:', lifterLmsId);
         
         if (!lifterLmsId) {
             alert('Please select a LifterLMS course to match');
@@ -49,7 +53,10 @@ jQuery(document).ready(function($) {
             lifterlms_course_id: lifterLmsId
         };
         
+        console.log('Sending AJAX data:', data);
+        
         $.post(cim_ajax.ajax_url, data, function(response) {
+            console.log('AJAX response:', response);
             if (response.success) {
                 $status.html('<span style="color: green;">✓ Matched</span>');
                 setTimeout(function() {
@@ -60,6 +67,11 @@ jQuery(document).ready(function($) {
                 alert(response.data || 'Failed to match courses');
                 $button.prop('disabled', false);
             }
+        }).fail(function(xhr, status, error) {
+            console.error('AJAX failed:', xhr, status, error);
+            $status.html('<span style="color: red;">✗ AJAX Error</span>');
+            alert('AJAX request failed: ' + error);
+            $button.prop('disabled', false);
         });
     });
     
