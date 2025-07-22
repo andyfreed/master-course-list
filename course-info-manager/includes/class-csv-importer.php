@@ -122,19 +122,28 @@ class CIM_CSV_Importer {
                     $course_data['edition']
                 ));
                 
+                // Insert or update course data
                 if ($existing) {
                     // Update existing record and track changes
                     $this->update_course_with_history($existing->id, $course_data);
+                    $this->updated_count++;
                 } else {
                     // Insert new record
-                    $wpdb->insert($table_name, $course_data);
+                    $result = $wpdb->insert($table_name, $course_data);
                     
-                    if ($wpdb->last_error) {
-                        throw new Exception('Database insert error: ' . $wpdb->last_error);
+                    if ($result === false) {
+                        $error_msg = $wpdb->last_error;
+                        $this->debug_info[] = "Database insert error for course {$course_data['four_digit']}: " . $error_msg;
+                        
+                        // Log the problematic data for debugging
+                        $this->debug_info[] = "Problematic data: " . json_encode($course_data);
+                        
+                        $this->skipped_count++;
+                        continue;
                     }
+                    
+                    $this->imported_count++;
                 }
-                
-                $this->imported_count++;
             }
             
             // Commit transaction
