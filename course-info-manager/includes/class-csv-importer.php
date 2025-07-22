@@ -30,8 +30,20 @@ class CIM_CSV_Importer {
         $headers = fgetcsv($handle);
         $headers = array_map('trim', $headers);
         
+        // Debug: Log the actual headers found
+        $this->debug_info[] = "CSV Headers found: " . implode(', ', $headers);
+        
         // Map CSV headers to database fields
         $field_mapping = $this->get_field_mapping();
+        
+        // Debug: Log the field mapping
+        $this->debug_info[] = "Field mapping keys: " . implode(', ', array_keys($field_mapping));
+        
+        // Check if 'Four Digit' header exists
+        if (!in_array('Four Digit', $headers)) {
+            $this->debug_info[] = "WARNING: 'Four Digit' header not found in CSV";
+            $this->debug_info[] = "Available headers: " . implode(', ', $headers);
+        }
         
         global $wpdb;
         $table_name = $wpdb->prefix . 'cim_course_info';
@@ -161,46 +173,122 @@ class CIM_CSV_Importer {
     private function get_field_mapping() {
         return array(
             'Four Digit' => 'four_digit',
+            'FourDigit' => 'four_digit',
+            'four_digit' => 'four_digit',
+            'four digit' => 'four_digit',
             'Previous Edition' => 'edition',
+            'PreviousEdition' => 'edition',
+            'previous_edition' => 'edition',
             'Current Year' => 'current_year',
+            'CurrentYear' => 'current_year',
+            'current_year' => 'current_year',
             'Course (Shaded by author)' => 'course_title',
+            'Course' => 'course_title',
+            'course_title' => 'course_title',
             '2025 Pages' => 'pages_2025',
+            '2025Pages' => 'pages_2025',
+            'pages_2025' => 'pages_2025',
             'NOTES' => 'notes',
+            'notes' => 'notes',
             'Santucci Title:' => 'santucci_title',
+            'SantucciTitle' => 'santucci_title',
+            'santucci_title' => 'santucci_title',
             'CFP' => 'cfp_credits',
+            'cfp_credits' => 'cfp_credits',
             'CPA' => 'cpa_credits',
+            'cpa_credits' => 'cpa_credits',
             'EA OTRP' => 'ea_otrp_credits',
+            'EAOTRP' => 'ea_otrp_credits',
+            'ea_otrp_credits' => 'ea_otrp_credits',
             'ERPA' => 'erpa_credits',
+            'erpa_credits' => 'erpa_credits',
             'CDFA' => 'cdfa_credits',
+            'cdfa_credits' => 'cdfa_credits',
             'CIMA CPWA RMA' => 'cima_cpwa_rma_credits',
+            'CIMACPWARMA' => 'cima_cpwa_rma_credits',
+            'cima_cpwa_rma_credits' => 'cima_cpwa_rma_credits',
             'IAR' => 'iar_credits',
+            'iar_credits' => 'iar_credits',
             'IAR #' => 'iar_number',
+            'IAR#' => 'iar_number',
+            'iar_number' => 'iar_number',
             '$ PDF or Exam Only' => 'price_pdf',
+            '$PDForExamOnly' => 'price_pdf',
+            'price_pdf' => 'price_pdf',
             '$ Print' => 'price_print',
+            '$Print' => 'price_print',
+            'price_print' => 'price_print',
             '$ per PDF CPE' => 'price_per_pdf_cpe',
+            '$perPDFCPE' => 'price_per_pdf_cpe',
+            'price_per_pdf_cpe' => 'price_per_pdf_cpe',
             'Annual Update (Launch)' => 'annual_update',
+            'AnnualUpdate' => 'annual_update',
+            'annual_update' => 'annual_update',
             'Exam Changes?' => 'exam_changes',
+            'ExamChanges' => 'exam_changes',
+            'exam_changes' => 'exam_changes',
             'Subs Updates' => 'subs_updates',
+            'SubsUpdates' => 'subs_updates',
+            'subs_updates' => 'subs_updates',
             'CFP Board #' => 'cfp_board_number',
+            'CFPBoard#' => 'cfp_board_number',
+            'cfp_board_number' => 'cfp_board_number',
             'EA #' => 'ea_number',
+            'EA#' => 'ea_number',
+            'ea_number' => 'ea_number',
             'ERPA #' => 'erpa_number',
+            'ERPA#' => 'erpa_number',
+            'erpa_number' => 'erpa_number',
             'CFP CE  Calc' => 'cfp_ce_calc',
+            'CFPCE Calc' => 'cfp_ce_calc',
+            'cfp_ce_calc' => 'cfp_ce_calc',
             'CPA CPE Calc' => 'cpa_cpe_calc',
+            'CPACPE Calc' => 'cpa_cpe_calc',
+            'cpa_cpe_calc' => 'cpa_cpe_calc',
             'CFP Words' => 'cfp_words',
+            'CFPWords' => 'cfp_words',
+            'cfp_words' => 'cfp_words',
             'CPA words' => 'cpa_words',
+            'CPAwords' => 'cpa_words',
+            'cpa_words' => 'cpa_words',
             'Rev Q' => 'rev_q',
+            'RevQ' => 'rev_q',
+            'rev_q' => 'rev_q',
             'Exam Q' => 'exam_q',
+            'ExamQ' => 'exam_q',
+            'exam_q' => 'exam_q',
             'Min. No. Exam Q' => 'min_exam_q',
+            'MinNoExamQ' => 'min_exam_q',
+            'min_exam_q' => 'min_exam_q',
             'IAR Words' => 'iar_words',
+            'IARWords' => 'iar_words',
+            'iar_words' => 'iar_words',
             'IAR Q' => 'iar_q',
+            'IARQ' => 'iar_q',
+            'iar_q' => 'iar_q',
             'CFP  Subj' => 'cfp_subject',
+            'CFPSubj' => 'cfp_subject',
+            'cfp_subject' => 'cfp_subject',
             'CPA  Subj' => 'cpa_subject',
+            'CPASubj' => 'cpa_subject',
+            'cpa_subject' => 'cpa_subject',
             'TX Subject Code' => 'tx_subject_code',
+            'TXSubjectCode' => 'tx_subject_code',
+            'tx_subject_code' => 'tx_subject_code',
             'Previous CFP Cr' => 'previous_cfp_cr',
+            'PreviousCFPCr' => 'previous_cfp_cr',
+            'previous_cfp_cr' => 'previous_cfp_cr',
             'Previous CPA Cr' => 'previous_cpa_cr',
+            'PreviousCPACr' => 'previous_cpa_cr',
+            'previous_cpa_cr' => 'previous_cpa_cr',
             'Previous EA OTRP ERP Cr' => 'previous_ea_otrp_erp_cr',
+            'PreviousEAOTRPERPCr' => 'previous_ea_otrp_erp_cr',
+            'previous_ea_otrp_erp_cr' => 'previous_ea_otrp_erp_cr',
             'Previous CDFA Cr' => 'previous_cdfa_cr',
-            'Notes' => 'notes_1'
+            'PreviousCDFACr' => 'previous_cdfa_cr',
+            'previous_cdfa_cr' => 'previous_cdfa_cr',
+            'Notes' => 'notes_1',
+            'notes_1' => 'notes_1'
         );
     }
     
