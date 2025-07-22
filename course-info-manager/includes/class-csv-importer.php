@@ -26,9 +26,14 @@ class CIM_CSV_Importer {
             return false;
         }
         
-        // Get headers
+        // Get headers and remove BOM (Byte Order Mark) if present
         $headers = fgetcsv($handle);
         $headers = array_map('trim', $headers);
+        
+        // Remove BOM from first header if present
+        if (!empty($headers[0])) {
+            $headers[0] = $this->remove_bom($headers[0]);
+        }
         
         // Debug: Log the actual headers found
         $this->debug_info[] = "CSV Headers found: " . implode(', ', $headers);
@@ -43,6 +48,13 @@ class CIM_CSV_Importer {
         if (!in_array('Four Digit', $headers)) {
             $this->debug_info[] = "WARNING: 'Four Digit' header not found in CSV";
             $this->debug_info[] = "Available headers: " . implode(', ', $headers);
+            
+            // Try to find a similar header
+            foreach ($headers as $header) {
+                if (stripos($header, 'four') !== false && stripos($header, 'digit') !== false) {
+                    $this->debug_info[] = "Found similar header: '$header'";
+                }
+            }
         }
         
         global $wpdb;
@@ -327,6 +339,25 @@ class CIM_CSV_Importer {
         }
         
         return $value;
+    }
+
+    /**
+     * Remove BOM (Byte Order Mark) from a string
+     */
+    private function remove_bom($string) {
+        // Remove UTF-8 BOM
+        if (substr($string, 0, 3) === "\xEF\xBB\xBF") {
+            return substr($string, 3);
+        }
+        // Remove UTF-16 BOM (little endian)
+        if (substr($string, 0, 2) === "\xFF\xFE") {
+            return substr($string, 2);
+        }
+        // Remove UTF-16 BOM (big endian)
+        if (substr($string, 0, 2) === "\xFE\xFF") {
+            return substr($string, 2);
+        }
+        return $string;
     }
     
     /**
