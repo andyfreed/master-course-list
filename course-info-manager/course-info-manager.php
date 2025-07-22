@@ -21,6 +21,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Check if WordPress is loaded
+if (!function_exists('add_action')) {
+    exit;
+}
+
 // Define plugin constants
 define('CIM_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('CIM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -29,8 +34,12 @@ define('CIM_VERSION', '1.0.0');
 // Plugin activation hook
 register_activation_hook(__FILE__, 'cim_activate_plugin');
 function cim_activate_plugin() {
-    cim_create_database_tables();
-    flush_rewrite_rules();
+    try {
+        cim_create_database_tables();
+        flush_rewrite_rules();
+    } catch (Exception $e) {
+        error_log('CIM Plugin Activation Error: ' . $e->getMessage());
+    }
 }
 
 // Plugin deactivation hook
@@ -42,6 +51,12 @@ function cim_deactivate_plugin() {
 // Create database tables (separate from LifterLMS)
 function cim_create_database_tables() {
     global $wpdb;
+    
+    // Check if we can access the database
+    if (!$wpdb) {
+        throw new Exception('Database connection not available');
+    }
+    
     $charset_collate = $wpdb->get_charset_collate();
     
     // Ensure upgrade.php is available
@@ -150,28 +165,35 @@ function cim_create_database_tables() {
     }
 }
 
-// Include required files
-$required_files = array(
-    CIM_PLUGIN_PATH . 'includes/class-course-manager.php',
-    CIM_PLUGIN_PATH . 'includes/class-csv-importer.php',
-    CIM_PLUGIN_PATH . 'includes/class-course-matcher.php',
-    CIM_PLUGIN_PATH . 'includes/admin/admin-menu.php',
-    CIM_PLUGIN_PATH . 'includes/admin/admin-ajax.php'
-);
+// Include required files with error handling
+function cim_include_files() {
+    $required_files = array(
+        CIM_PLUGIN_PATH . 'includes/class-course-manager.php',
+        CIM_PLUGIN_PATH . 'includes/class-csv-importer.php',
+        CIM_PLUGIN_PATH . 'includes/class-course-matcher.php',
+        CIM_PLUGIN_PATH . 'includes/admin/admin-menu.php',
+        CIM_PLUGIN_PATH . 'includes/admin/admin-ajax.php'
+    );
 
-foreach ($required_files as $file) {
-    if (file_exists($file)) {
-        require_once $file;
-    } else {
-        error_log('CIM Plugin: Required file not found: ' . $file);
+    foreach ($required_files as $file) {
+        if (file_exists($file)) {
+            require_once $file;
+        } else {
+            error_log('CIM Plugin: Required file not found: ' . $file);
+        }
     }
 }
 
 // Initialize the plugin
 add_action('init', 'cim_init');
 function cim_init() {
+    // Include files
+    cim_include_files();
+    
     // Load text domain for translations
-    load_plugin_textdomain('course-info-manager', false, dirname(plugin_basename(__FILE__)) . '/languages');
+    if (function_exists('load_plugin_textdomain')) {
+        load_plugin_textdomain('course-info-manager', false, dirname(plugin_basename(__FILE__)) . '/languages');
+    }
 }
 
 // Add admin styles and scripts
@@ -192,12 +214,20 @@ add_action('lifterlms_single_course_after_summary', 'cim_display_course_info', 1
 function cim_display_course_info() {
     global $post;
     
+    // Check if LifterLMS is active and we have a valid post
+    if (!function_exists('lifterlms_get_post') || !$post) {
+        return;
+    }
+    
     // Get course info if matched
     $course_manager = new CIM_Course_Manager();
     $course_info = $course_manager->get_course_by_lifterlms_id($post->ID);
     
     if ($course_info) {
         // Load template for displaying course credits and info
-        include CIM_PLUGIN_PATH . 'templates/course-info-display.php';
+        $template_path = CIM_PLUGIN_PATH . 'templates/course-info-display.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        }
     }
 } 
