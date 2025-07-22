@@ -64,11 +64,40 @@ class CIM_Course_Matcher {
         
         $matches = array();
         
-        // Search in post title
+        // Search in FLMS courses by SKU (which should contain the course code)
+        $sku_results = $wpdb->get_results($wpdb->prepare("
+            SELECT p.ID, p.post_title, pm.meta_value as sku
+            FROM {$wpdb->posts} p
+            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE p.post_type = 'flms-courses' 
+            AND p.post_status = 'publish'
+            AND pm.meta_key = '_sku'
+            AND (pm.meta_value LIKE %s OR pm.meta_value = %s)
+        ", '%' . $four_digit . '%', $edition));
+        
+        foreach ($sku_results as $result) {
+            $confidence = 50;
+            
+            // Higher confidence if exact match
+            if ($result->sku == $four_digit || $result->sku == $edition) {
+                $confidence = 95;
+            } elseif (strpos($result->sku, $four_digit) !== false) {
+                $confidence = 80;
+            }
+            
+            $matches[] = array(
+                'course_id' => $result->ID,
+                'course_title' => $result->post_title,
+                'confidence' => $confidence,
+                'match_reason' => 'SKU match: ' . $result->sku
+            );
+        }
+        
+        // Search in post title for FLMS courses
         $title_results = $wpdb->get_results($wpdb->prepare("
             SELECT ID, post_title 
             FROM {$wpdb->posts}
-            WHERE post_type = 'course' 
+            WHERE post_type = 'flms-courses' 
             AND post_status = 'publish'
             AND (post_title LIKE %s OR post_title LIKE %s)
         ", '%' . $four_digit . '%', '%' . $edition . '%'));
@@ -78,59 +107,43 @@ class CIM_Course_Matcher {
             
             // Higher confidence if exact edition match
             if (strpos($result->post_title, $edition) !== false) {
-                $confidence = 95;
+                $confidence = 85;
             } elseif (strpos($result->post_title, $four_digit) !== false) {
-                $confidence = 80;
+                $confidence = 70;
             }
             
             $matches[] = array(
                 'course_id' => $result->ID,
                 'course_title' => $result->post_title,
-                'confidence' => $confidence
+                'confidence' => $confidence,
+                'match_reason' => 'Title match'
             );
         }
         
-        // Search in post meta (SKU or custom field)
-        $meta_results = $wpdb->get_results($wpdb->prepare("
-            SELECT p.ID, p.post_title, pm.meta_value
-            FROM {$wpdb->posts} p
-            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-            WHERE p.post_type = 'course' 
-            AND p.post_status = 'publish'
-            AND pm.meta_key IN ('_sku', '_course_code', 'course_code')
-            AND (pm.meta_value LIKE %s OR pm.meta_value = %s)
-        ", '%' . $four_digit . '%', $edition));
+        // Search in other post types as fallback
+        $other_results = $wpdb->get_results($wpdb->prepare("
+            SELECT ID, post_title 
+            FROM {$wpdb->posts}
+            WHERE post_type IN ('course', 'llms_course', 'sfwd-courses', 'courses', 'mnc-courses')
+            AND post_status = 'publish'
+            AND (post_title LIKE %s OR post_title LIKE %s)
+        ", '%' . $four_digit . '%', '%' . $edition . '%'));
         
-        foreach ($meta_results as $result) {
-            $confidence = 85;
+        foreach ($other_results as $result) {
+            $confidence = 40; // Lower confidence for non-FLMS courses
             
-            // Higher confidence if exact match
-            if ($result->meta_value == $edition) {
-                $confidence = 100;
-            } elseif ($result->meta_value == $four_digit) {
-                $confidence = 90;
+            if (strpos($result->post_title, $edition) !== false) {
+                $confidence = 75;
+            } elseif (strpos($result->post_title, $four_digit) !== false) {
+                $confidence = 60;
             }
             
-            // Check if already in matches
-            $found = false;
-            foreach ($matches as &$match) {
-                if ($match['course_id'] == $result->ID) {
-                    // Update confidence if higher
-                    if ($confidence > $match['confidence']) {
-                        $match['confidence'] = $confidence;
-                    }
-                    $found = true;
-                    break;
-                }
-            }
-            
-            if (!$found) {
-                $matches[] = array(
-                    'course_id' => $result->ID,
-                    'course_title' => $result->post_title,
-                    'confidence' => $confidence
-                );
-            }
+            $matches[] = array(
+                'course_id' => $result->ID,
+                'course_title' => $result->post_title,
+                'confidence' => $confidence,
+                'match_reason' => 'Other post type match'
+            );
         }
         
         return $matches;
@@ -256,6 +269,60 @@ class CIM_Course_Matcher {
     }
     
     /**
+     * Get active courses only (filter out inactive/old versions)
+     */
+    public function get_active_courses() {
+        global $wpdb;
+        
+        $courses = array();
+        
+        // Get FLMS courses with active version meta
+        $active_courses = $wpdb->get_results("
+            SELECT p.ID, p.post_title, p.post_content, p.post_status,
+                   pm.meta_value as active_version
+            FROM {$wpdb->posts} p
+            LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = 'flms_course_active_version'
+            WHERE p.post_type = 'flms-courses' 
+            AND p.post_status = 'publish'
+            ORDER BY p.post_title
+        ");
+        
+        foreach ($active_courses as $course) {
+            // Get course meta data
+            $course_meta = $wpdb->get_results($wpdb->prepare("
+                SELECT meta_key, meta_value
+                FROM {$wpdb->postmeta}
+                WHERE post_id = %d
+                AND meta_key IN ('_sku', 'flms_woocommerce_course_id', 'cpa', '_cfp', 'cpa_cpe_calc', 'cfp_word_count', 'cpa_word_count', 'texas_subject_code', 'bhfe_archived_course')
+            ", $course->ID));
+            
+            $meta_data = array();
+            foreach ($course_meta as $meta) {
+                $meta_data[$meta->meta_key] = $meta->meta_value;
+            }
+            
+            // Skip archived courses
+            if (isset($meta_data['bhfe_archived_course']) && $meta_data['bhfe_archived_course'] == '1') {
+                continue;
+            }
+            
+            $courses[] = array(
+                'id' => $course->ID,
+                'title' => $course->post_title,
+                'content' => $course->post_content,
+                'type' => 'flms_course',
+                'meta' => $meta_data,
+                'sku' => isset($meta_data['_sku']) ? $meta_data['_sku'] : '',
+                'woo_id' => isset($meta_data['flms_woocommerce_course_id']) ? $meta_data['flms_woocommerce_course_id'] : '',
+                'active_version' => $course->active_version,
+                'is_active' => !isset($meta_data['bhfe_archived_course']) || $meta_data['bhfe_archived_course'] != '1'
+            );
+        }
+        
+        return $courses;
+    }
+    
+    /**
      * Get all LifterLMS courses for matching
      */
     public function get_lifterlms_courses() {
@@ -263,36 +330,52 @@ class CIM_Course_Matcher {
         
         $courses = array();
         
-        // Method 1: Check for LifterLMS course post type
-        $lifterlms_courses = $wpdb->get_results("
-            SELECT ID, post_title, post_content 
+        // Method 1: Check for FLMS courses (primary method for this setup)
+        $flms_courses = $wpdb->get_results("
+            SELECT ID, post_title, post_content, post_status
             FROM {$wpdb->posts}
-            WHERE post_type = 'course' 
+            WHERE post_type = 'flms-courses' 
             AND post_status = 'publish'
             ORDER BY post_title
         ");
         
-        if (!empty($lifterlms_courses)) {
-            foreach ($lifterlms_courses as $course) {
+        if (!empty($flms_courses)) {
+            foreach ($flms_courses as $course) {
+                // Get course meta data
+                $course_meta = $wpdb->get_results($wpdb->prepare("
+                    SELECT meta_key, meta_value
+                    FROM {$wpdb->postmeta}
+                    WHERE post_id = %d
+                    AND meta_key IN ('_sku', 'flms_woocommerce_course_id', 'cpa', '_cfp', 'cpa_cpe_calc', 'cfp_word_count', 'cpa_word_count', 'texas_subject_code')
+                ", $course->ID));
+                
+                $meta_data = array();
+                foreach ($course_meta as $meta) {
+                    $meta_data[$meta->meta_key] = $meta->meta_value;
+                }
+                
                 $courses[] = array(
                     'id' => $course->ID,
                     'title' => $course->post_title,
                     'content' => $course->post_content,
-                    'type' => 'lifterlms_course'
+                    'type' => 'flms_course',
+                    'meta' => $meta_data,
+                    'sku' => isset($meta_data['_sku']) ? $meta_data['_sku'] : '',
+                    'woo_id' => isset($meta_data['flms_woocommerce_course_id']) ? $meta_data['flms_woocommerce_course_id'] : ''
                 );
             }
         }
         
-        // Method 2: Check for custom post types that might be courses
-        $custom_courses = $wpdb->get_results("
+        // Method 2: Check for other course post types as fallback
+        $other_courses = $wpdb->get_results("
             SELECT ID, post_title, post_content, post_type
             FROM {$wpdb->posts}
-            WHERE post_type IN ('llms_course', 'sfwd-courses', 'course', 'courses')
+            WHERE post_type IN ('course', 'llms_course', 'sfwd-courses', 'courses', 'mnc-courses')
             AND post_status = 'publish'
             ORDER BY post_title
         ");
         
-        foreach ($custom_courses as $course) {
+        foreach ($other_courses as $course) {
             // Avoid duplicates
             $exists = false;
             foreach ($courses as $existing) {
@@ -312,13 +395,13 @@ class CIM_Course_Matcher {
             }
         }
         
-        // Method 3: Check post meta for course-related data
+        // Method 3: Check for courses with specific meta fields
         $meta_courses = $wpdb->get_results("
-            SELECT DISTINCT p.ID, p.post_title, p.post_content, pm.meta_key, pm.meta_value
+            SELECT DISTINCT p.ID, p.post_title, p.post_content, p.post_type, pm.meta_key, pm.meta_value
             FROM {$wpdb->posts} p
             JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
             WHERE p.post_status = 'publish'
-            AND pm.meta_key IN ('_course_code', 'course_code', '_sku', 'course_credits', 'cfp_credits', 'cpa_credits')
+            AND pm.meta_key IN ('_course_code', 'course_code', '_sku', 'course_credits', 'cfp_credits', 'cpa_credits', 'flms_woocommerce_course_id')
             ORDER BY p.post_title
         ");
         
@@ -339,7 +422,7 @@ class CIM_Course_Matcher {
                     'content' => $course->post_content,
                     'meta_key' => $course->meta_key,
                     'meta_value' => $course->meta_value,
-                    'type' => 'meta_course'
+                    'type' => $course->post_type
                 );
             }
         }

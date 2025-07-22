@@ -284,7 +284,10 @@ function cim_matching_page() {
     
     // Get LifterLMS courses using the new discovery function
     $matcher = new CIM_Course_Matcher();
-    $lifterlms_courses = $matcher->get_lifterlms_courses();
+    $lifterlms_courses = $matcher->get_active_courses(); // Use active courses only
+    
+    // Get total courses for comparison
+    $all_courses = $matcher->get_lifterlms_courses();
     
     ?>
     <div class="wrap">
@@ -297,9 +300,14 @@ function cim_matching_page() {
                 <p>Ready to match</p>
             </div>
             <div class="cim-stat-box">
-                <h3>LifterLMS Courses Found</h3>
+                <h3>Active FLMS Courses</h3>
                 <p class="cim-stat-number"><?php echo count($lifterlms_courses); ?></p>
                 <p>Available for matching</p>
+            </div>
+            <div class="cim-stat-box">
+                <h3>Total FLMS Courses</h3>
+                <p class="cim-stat-number"><?php echo count($all_courses); ?></p>
+                <p>Including inactive/archived</p>
             </div>
         </div>
         
@@ -326,10 +334,13 @@ function cim_matching_page() {
                     </div>
                     <div class="cim-match-select">
                         <select class="cim-lifterlms-select">
-                            <option value="">-- Select LifterLMS Course --</option>
+                            <option value="">-- Select FLMS Course --</option>
                             <?php foreach ($lifterlms_courses as $lms_course): ?>
                                 <option value="<?php echo $lms_course['id']; ?>">
                                     <?php echo esc_html($lms_course['title']); ?> 
+                                    <?php if (!empty($lms_course['sku'])): ?>
+                                        (SKU: <?php echo esc_html($lms_course['sku']); ?>)
+                                    <?php endif; ?>
                                     (<?php echo esc_html($lms_course['type']); ?>)
                                 </option>
                             <?php endforeach; ?>
@@ -485,7 +496,7 @@ function cim_diagnostics_page() {
                             <td><?php echo $pt->count; ?></td>
                             <td>
                                 <?php 
-                                $course_types = array('course', 'llms_course', 'sfwd-courses', 'courses', 'lesson', 'llms_lesson');
+                                $course_types = array('course', 'llms_course', 'sfwd-courses', 'courses', 'lesson', 'llms_lesson', 'flms-courses', 'mnc-courses');
                                 echo in_array($pt->post_type, $course_types) ? '✓ Yes' : '✗ No';
                                 ?>
                             </td>
@@ -535,7 +546,7 @@ function cim_diagnostics_page() {
         $sample_courses = $wpdb->get_results("
             SELECT ID, post_title, post_type, post_status
             FROM {$wpdb->posts}
-            WHERE post_type IN ('course', 'llms_course', 'sfwd-courses', 'courses')
+            WHERE post_type IN ('course', 'llms_course', 'sfwd-courses', 'courses', 'flms-courses', 'mnc-courses')
             AND post_status = 'publish'
             ORDER BY post_title
             LIMIT 10
