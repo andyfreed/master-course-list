@@ -202,13 +202,42 @@ function cim_init() {
 // Add admin styles and scripts
 add_action('admin_enqueue_scripts', 'cim_admin_enqueue_scripts');
 function cim_admin_enqueue_scripts($hook) {
-    if (strpos($hook, 'course-info-manager') !== false) {
+    // Debug: Log the hook name to see what we're getting
+    error_log('CIM Plugin: Admin hook detected: ' . $hook);
+    
+    // Check if we're on any of our plugin pages - be more aggressive
+    $should_load = false;
+    
+    // Check hook name
+    if (strpos($hook, 'course-info-manager') !== false || strpos($hook, 'cim') !== false) {
+        $should_load = true;
+    }
+    
+    // Check GET parameter
+    if (isset($_GET['page']) && strpos($_GET['page'], 'course-info-manager') !== false) {
+        $should_load = true;
+    }
+    
+    // Check current screen
+    $screen = get_current_screen();
+    if ($screen && strpos($screen->id, 'course-info-manager') !== false) {
+        $should_load = true;
+    }
+    
+    if ($should_load) {
+        error_log('CIM Plugin: Enqueuing scripts for hook: ' . $hook);
+        
         wp_enqueue_style('cim-admin-style', CIM_PLUGIN_URL . 'assets/css/admin-style.css', array(), CIM_VERSION);
         wp_enqueue_script('cim-admin-script', CIM_PLUGIN_URL . 'assets/js/admin-script.js', array('jquery'), CIM_VERSION, true);
         wp_localize_script('cim-admin-script', 'cim_ajax', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('cim_ajax_nonce')
         ));
+        
+        // Add a simple test to verify jQuery is loaded
+        wp_add_inline_script('cim-admin-script', 'console.log("CIM Plugin: Scripts loaded successfully");');
+    } else {
+        error_log('CIM Plugin: Scripts not loaded for hook: ' . $hook);
     }
 }
 

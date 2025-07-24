@@ -1,4 +1,5 @@
 jQuery(document).ready(function($) {
+    console.log('CIM Plugin: JavaScript loaded and jQuery ready');
     
     // Course search functionality
     let searchTimer;
